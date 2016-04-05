@@ -19,12 +19,12 @@ This is a personal project of Udacity's Nanodegree program, Senior Web Developer
 ___________________________________	
 1. **Clone the repository**
 
-	`git clone <https://github.com/Buda9/Udacity-Project-1-Meet-Up-Event-Planner.git>
+	`git clone <https://github.com/Buda9/Udacity-Project-1-Meet-Up-Event-Planner.git>`
 
 2. **Install the dependencies**
 	
 	To install the required dependencies call `npm install` from the root directory.
 
-3. **Run the build and launch the development server
+3. **Run the build and launch the development server**
 
 	Launch the project with `gulp`
