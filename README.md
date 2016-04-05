@@ -27,16 +27,4 @@ ___________________________________
 
 3. **Run the build and launch the development server
 
-	Serve the files via a static fileserver.  Or to build the files and launch the project call `gulp` or `gulp serve` to open up browsersync.
-
-## Dependencies
-__________________________
-I used the following tools on this project
-
-* [npm](https://www.npmjs.com/package/npm) - package manager
-* AngularJs - routing, MV*, event listeners, directives, factories
-* Firebase - storage
-* Angularfire - to connect Angular with Firebase
-* ESLint - linter
-* bootstrap - for styles
-
+	Launch the project with `gulp`
