@@ -1,64 +1,201 @@
-var gulp=require('gulp');
-var uglify = require('gulp-uglify');
-var minifyCss = require('gulp-minify-css');
-var minifyHTML = require('gulp-minify-html');
-var minifyInline = require('gulp-minify-inline');
-var eslint = require('gulp-eslint');
-var postcss      = require('gulp-postcss');
-var autoprefixer = require('autoprefixer');
+/*=============================================
+=            Gulp Starter by @Buda9           =
+=============================================*/
 
-var browserSync=require('browser-sync').create();
-var reload = browserSync.reload;
+'use strict';
 
+/**
+*
+* The packages we are using
+*
+**/
+var gulp         = require('gulp'),
+    sass         = require('gulp-sass'),
+    minifyHTML   = require('gulp-minify-html'),
+    minifyInline = require('gulp-minify-inline'),
+    autoprefixer = require('gulp-autoprefixer'),
+    minifycss    = require('gulp-minify-css'),
+    uglify       = require('gulp-uglify'),
+    sourcemaps   = require('gulp-sourcemaps'),
+    rename       = require('gulp-rename'),
+    del          = require('del'),
+    browserSync  = require('browser-sync'),
+    reload       = browserSync.reload,
+    concat       = require('gulp-concat'),
+    useref       = require('gulp-useref'),
+    plumber      = require('gulp-plumber'),
+    cssshrink    = require('gulp-cssshrink'),
+    changed      = require('gulp-changed'),
+    imagemin     = require('gulp-imagemin'),
+    pngquant     = require('imagemin-pngquant'),
+    size         = require('gulp-size'),
+    notify       = require('gulp-notify'),
+    critical     = require('critical').stream;
 
-gulp.task('run', ['watch'], function(){
-	browserSync.init({
-		server: 'src/'
-	});
-	browserSync.stream();
+/**
+*
+* Compile Sass to CSS
+* - Compile
+* - Compress/Minify
+* - Autoprefixer
+* - Sourcemaps
+*
+**/
+gulp.task('compileSass', function() {
+  var onError = function(err) {
+      notify.onError({
+          title:    "Gulp",
+          subtitle: "Failure!",
+          message:  "Error: <%= error.message %>",
+          sound:    "Beep"
+      })(err);
+      this.emit('end');
+  };
+
+  return gulp.src('./src/sass/style.scss')
+    // Initialize css.map
+    .pipe(sourcemaps.init())
+    .pipe(plumber({errorHandler: onError}))
+    .pipe(sass())
+    .pipe(size({ gzip: true, showFiles: true }))
+    // Initialize autoprefixer
+    .pipe(autoprefixer('last 2 version', 'safari 5', 'ie 8', 'ie 9', 'opera 12.1', 'ios 6', 'android 4'))
+    // Directory of compiled Sass
+    .pipe(gulp.dest('public/css'))
+    .pipe(rename({suffix: '.min'}))
+    // Minify compiled CSS
+    .pipe(minifycss({ processImport: false }))
+    .pipe(cssshrink())
+    // Use this-> ('./') if you want to add css.map in the same folder as compiled CSS, otherwise write folder name
+    .pipe(sourcemaps.write('./maps'))
+    .pipe(size({ gzip: true, showFiles: true }))
+    .pipe(gulp.dest('public/css'))
+    .pipe(browserSync.reload({stream:true}));
 });
 
-gulp.task('run-dist', ['default'], function(){
-	browserSync.init({
-		server: 'dist/'
-	});
-	browserSync.stream();
+/**
+*
+* Generate & Inline Critical-path CSS
+*
+**/
+gulp.task('critical', ['run'], function () {
+    return gulp.src('public/*.html')
+        .pipe(critical({base: './public', inline: true, css: ['public/css/style.css']}))
+        .pipe(gulp.dest('public/'));
 });
 
-gulp.task('compress-js', function() {
-	return gulp.src('src/js/*.js')
-	.pipe(uglify())
-	.pipe(gulp.dest('dist/js'))
-	.pipe(reload({stream:true}));
+/**
+*
+* Minify and concat scripts
+* - Sourcemaps
+* - Concat
+* - Uglify
+*
+**/
+gulp.task('minifyConcatScripts', function() {
+  return gulp.src(['./src/javascripts/**'])
+    // Initialize source maps for Javascript
+    .pipe(sourcemaps.init())
+    .pipe(plumber())
+    // Name and location of the compiled file
+    .pipe(concat('app.js'))
+    .pipe(gulp.dest('public/js'))
+    .pipe(rename({suffix: '.min'}))
+    .pipe(uglify())
+    .pipe(size({ gzip: true, showFiles: true }))
+    // Path for maps. This in brackets (./) means it will stay in same location
+    // If you wish to add maps in one directory up we can use this: '../maps'
+    .pipe(sourcemaps.write('./maps'))
+    .pipe(gulp.dest('public/js'))
+    .pipe(browserSync.reload({stream:true}));
 });
 
-gulp.task('minify-css', function() {
-	return gulp.src('src/css/*.css')
-	.pipe(minifyCss({compatibility: 'ie8'}))
-    .pipe(postcss([ autoprefixer({ browsers: ['last 2 versions'] }) ]))
-	.pipe(gulp.dest('dist/css'))
-	.pipe(reload({stream:true}));
+/**
+*
+* Images
+* - Compress them!
+*
+**/
+gulp.task('imgOptimize', function () {
+  return gulp.src('src/images/**')
+    .pipe(changed('public/images'))
+    .pipe(imagemin({
+      // Lossless conversion to progressive JPGs
+      progressive: true,
+      // Interlace GIFs for progressive rendering
+      interlaced: true,
+      svgoPlugins: [{removeViewBox: false}],
+      use: [pngquant()]
+    }))
+    .pipe(gulp.dest('public/images'))
+    .pipe(size({title: 'imgOptimize'}));
 });
 
-gulp.task('compress-html', function() {
-	return gulp.src('src/*.html')
-	.pipe(minifyInline())
-	.pipe(minifyHTML())
-	.pipe(gulp.dest('dist/'))
-	.pipe(reload({stream:true}));
+/**
+*
+* Compress and minify HTML
+* - Shrink HTML file size!
+*
+**/
+gulp.task('compressHtml', function() {
+  return gulp.src('./src/*.html')
+    .pipe(useref())
+    .pipe(minifyInline())
+    .pipe(minifyHTML())
+    .pipe(gulp.dest('public/'));
 });
 
-gulp.task('lint', function(){
-	return gulp.src('src/js/*.js').pipe(eslint()).pipe(eslint.format());
+/**
+*
+* BrowserSync.io
+* - Watch CSS, JS & HTML for changes
+* - View project at: localhost:3000
+* - Serving content from /public/ folder
+*
+**/
+gulp.task('run', ['compileSass', 'minifyConcatScripts'], function() {
+  browserSync({
+    server: {
+      baseDir: "./public/",
+      injectChanges: true
+    }
+  });
 });
 
-gulp.task('watch', function(){
-	gulp.watch(['src/*.html'], ['compress-html']);
-	gulp.watch(['src/css/*.css'], ['minify-css']);
-	gulp.watch(['src/js/*.js'], ['compress-js']);
+/**
+*
+* Use gulp clean if you want to manually remove compiled files and folders
+*
+**/
+gulp.task('clean', function() {
+  del(['public']);
 });
 
-gulp.task('default', ['compress-html', 'compress-js', 'minify-css', 'watch', 'run']);
+/**
+*
+* Watch for file changes for html, images, scripts and sass/css
+*
+**/
+gulp.task('watch', function() {
+  // Watch .html files
+  gulp.watch('src/**/*.html', ['compressHtml', browserSync.reload]);
+  gulp.watch("public/*.html").on('change', browserSync.reload);
+  // Watch .sass files
+  gulp.watch('src/sass/**/*.scss', ['compileSass', browserSync.reload]);
+  // Watch .js files
+  gulp.watch('src/js/*.js', ['minifyConcatScripts', browserSync.reload]);
+  // Watch image files
+  gulp.watch('src/images/**/*', ['imgOptimize', browserSync.reload]);
+});
 
-
-
+/**
+*
+* Default task
+* - Clean previous build and create new on every gulp call
+* - Runs compileSass, browserSync, minifyConcatScripts and imgOptimize tasks
+* - Watchs for file changes for images, scripts and sass/css
+*
+**/
+gulp.task('default', function() {
+    gulp.start('clean', 'compileSass', 'minifyConcatScripts', 'imgOptimize', 'compressHtml', 'run', 'watch');
+});
